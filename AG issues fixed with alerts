@@ -1,0 +1,26 @@
+---TSQL TO ADD IN THE JOBS
+
+DECLARE @SQLCMD VARCHAR(1000);
+DECLARE cDBSuspended CURSOR FOR
+SELECT 'ALTER DATABASE [' + DB_NAME(database_id) + '] SET HADR RESUME;'
+FROM sys.dm_hadr_database_replica_states drs
+JOIN sys.availability_replicas ar ON ar.replica_id = drs.replica_id
+WHERE ar.replica_server_name = @@SERVERNAME
+AND drs.is_suspended = 1;
+ 
+OPEN cDBSuspended;
+FETCH NEXT FROM cDBSuspended INTO @SQLCMD;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+EXECUTE (@SQLCMD);
+FETCH NEXT FROM cDBSuspended INTO @SQLCMD;
+END;
+CLOSE cDBSuspended;
+DEALLOCATE cDBSuspended
+
+
+
+
+Link for gui setup.
+note. use this script above
+https://blog.waynesheffield.com/wayne/archive/2020/08/availability-group-issues-fixed-with-alerts/
