@@ -1,0 +1,178 @@
+
+----Alert1
+
+https://www.sqlservercentral.com/forums/topic/how-to-set-alert-when-alwayson-high-availabilty-database-stop-synchronizing  
+
+
+This one generate MORE THAN 10 ALERT
+
+  Set Nocount On;
+
+Declare @alertName sysname
+      , @thisErrorNumber varchar(6)
+      , @sqlCommand nvarchar(max) = ''
+      , @operatorName sysname = 'DBAs';
+
+Declare @errorNumbers Table (ErrorNumber varchar(6), AlertName varchar(50));
+
+ Insert Into @errorNumbers
+ Values ('1480' , 'AG Role Change (failover)')
+      , ('976'  , 'Database Not Accessible')
+      , ('983'  , 'Database Role Resolving')
+      , ('3402' , 'Database Restoring')
+      , ('19406', 'AG Replica Changed States')
+      , ('35206', 'Connection Timeout')
+      , ('35250', 'Connection to Primary Inactive')
+      , ('35264', 'Data Movement Suspended')
+      , ('35273', 'Database Inaccessible')
+      , ('35274', 'Database Recovery Pending')
+      , ('35275', 'Database in Suspect State')
+      , ('35276', 'Database Out of Sync')
+      , ('41091', 'Replica Going Offline')
+      , ('41131', 'Failed to Bring AG Online')
+      , ('41142', 'Replica Cannot Become Primary')
+      , ('41406', 'AG Not Ready for Auto Failover')
+      , ('41414', 'Secondary Not Connected');
+
+Declare cur_ForEachErrorNumber Cursor Local fast_forward 
+    For 
+ Select *
+   From @errorNumbers;
+
+   Open cur_ForEachErrorNumber;
+  Fetch Next From cur_ForEachErrorNumber Into @thisErrorNumber, @alertName;
+
+  While @@fetch_status = 0
+  Begin
+
+     If Not Exists(Select *
+                     From msdb.dbo.sysalerts s
+                    Where s.message_id = @thisErrorNumber)
+  Begin 
+
+Execute msdb.dbo.sp_add_alert 
+        @name = @alertName
+      , @message_id = @thisErrorNumber
+      , @severity = 0
+      , @enabled = 1 
+      , @delay_between_responses = 0 
+      , @include_event_description_in = 1 
+      , @job_id = N'00000000-0000-0000-0000-000000000000';
+
+Execute msdb.dbo.sp_add_notification 
+        @alert_name = @alertName
+      , @operator_name = @operatorName
+      , @notification_method = 1;
+
+        Raiserror('Alert ''%s'' for error number %s created.', -1, -1, @alertName, @thisErrorNumber) With nowait;
+    End
+
+
+=====================================================================================================------------------------------============================================================================================
+
+
+---ALERT 2
+
+USE [msdb]
+GO
+/* *************************************************************** */ 
+EXEC msdb.dbo.sp_add_alert @name=N'HA Error_Role Change - 35202',
+  @message_id=35202, 
+  @severity=0, 
+  @enabled=1, 
+  @delay_between_responses=0, 
+  @include_event_description_in=1, 
+  @job_id=N'00000000-0000-0000-0000-000000000000'
+  GO
+  EXEC msdb.dbo.sp_add_notification @alert_name=N'Role Change', 
+    @operator_name=N'DBAs', @notification_method = 1
+  GO 
+/* *************************************************************** */ 
+EXEC msdb.dbo.sp_add_alert @name=N'HA Error_Data Movement Suspended-35264',
+  @message_id=35264, 
+  @severity=0, 
+  @enabled=1, 
+  @delay_between_responses=0, 
+  @include_event_description_in=1, 
+  @job_id=N'00000000-0000-0000-0000-000000000000'
+  GO
+  EXEC msdb.dbo.sp_add_notification @alert_name=N'Data Movement Suspended', 
+    @operator_name=N'DBAs', @notification_method = 1
+  GO 
+/* *************************************************************** */ 
+EXEC msdb.dbo.sp_add_alert @name=N'HA Error_Data Movement Resumed - 35265',
+  @message_id=35265, 
+  @severity=0, 
+  @enabled=1, 
+  @delay_between_responses=0, 
+  @include_event_description_in=1, 
+  @job_id=N'00000000-0000-0000-0000-000000000000'
+  GO
+  EXEC msdb.dbo.sp_add_notification @alert_name=N'Error_Data Movement Resumed', 
+    @operator_name=N'DBAs', @notification_method = 1
+  GO 
+/* *************************************************************** */ 
+EXEC msdb.dbo.sp_add_alert @name=N'HA Error_connection timeout-35206',
+  @message_id=35206, 
+  @severity=0, 
+  @enabled=1, 
+  @delay_between_responses=0, 
+  @include_event_description_in=1, 
+  @job_id=N'00000000-0000-0000-0000-000000000000'
+  GO
+  EXEC msdb.dbo.sp_add_notification @alert_name=N'connection timeout ', 
+    @operator_name=N'DBAs', @notification_method = 1
+  GO 
+/* *************************************************************** */ 
+
+==============================================================================================================================================---------------=============================================================================
+
+Alert 3
+
+https://www.mssqltips.com/sqlservertip/2973/configuring-alerts-for-sql-server-alwayson-availability-groups/
+
+SET NOCOUNT ON
+
+-- first create a temporary table to store your target error numbers
+DECLARE @errorNumbers TABLE ( ErrorNumber VARCHAR(6) )
+INSERT INTO @errorNumbers
+ VALUES ('35273'),('35274'),('35275'),('35254'),('35279'),('35262'),('35276')
+
+-- get the correct DB context
+PRINT 'USE [msdb]'
+PRINT 'GO'
+PRINT '/* *************************************************************** */ '
+
+-- use a cursor to iterate over each error number (yes, I know)...
+DECLARE  @thisErrorNumber VARCHAR(6)
+
+DECLARE  cur_ForEachErrorNumber CURSOR LOCAL FAST_FORWARD
+FOR SELECT ErrorNumber FROM @errorNumbers
+
+OPEN  cur_ForEachErrorNumber
+
+FETCH NEXT FROM cur_ForEachErrorNumber INTO @thisErrorNumber
+WHILE @@FETCH_STATUS = 0
+BEGIN
+ PRINT 
+  'EXEC msdb.dbo.sp_add_alert @name=N''HA Error - ' + @thisErrorNumber + ''',
+  @message_id=' + @thisErrorNumber + ', 
+  @severity=0, 
+  @enabled=1, 
+  @delay_between_responses=0, 
+  @include_event_description_in=1, 
+  @job_id=N''00000000-0000-0000-0000-000000000000''
+  GO
+  EXEC msdb.dbo.sp_add_notification @alert_name=N''HA Error - ' + @thisErrorNumber + ''', 
+    @operator_name=N''DBAs'', @notification_method = 1
+  GO '
+ PRINT '/* *************************************************************** */ '
+ FETCH NEXT FROM cur_ForEachErrorNumber INTO @thisErrorNumber
+END
+
+CLOSE  cur_ForEachErrorNumber
+DEALLOCATE cur_ForEachErrorNumber
+
+
+
+
