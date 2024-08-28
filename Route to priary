@@ -1,0 +1,8 @@
+IF (
+SELECT top 1 ars.role_desc
+        FROM sys.dm_hadr_availability_replica_states ars
+        JOIN sys.availability_groups ag ON ars.group_id = ag.group_id AND ars.is_local = 1)  <> 'PRIMARY'
+    BEGIN
+       -- Secondary node, throw an error
+       raiserror ('Not the AG primary', 2, 1)
+    END
